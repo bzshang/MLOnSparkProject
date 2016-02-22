@@ -8,7 +8,7 @@ One image is stored per row. The image is assumed to be 64x64 pixels with one ch
 Columns
 
 * 0. User Id. Corresponds to folder name (1-500 for train) (501-700 for validation)
-* 1. Slice Id. The number in sax_### folder
+* 1. Slice Id. The number in sax_# folder
 * 2. Time Id. 1-30. The time index associated with the image
 * 3. Age
 * 4. Gender
