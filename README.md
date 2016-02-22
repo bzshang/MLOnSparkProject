@@ -14,4 +14,4 @@ Columns
 4. Gender
 5. Slice location
 6. Slice thickness
-7-4102. Pixel intensity (0-255 grayscale) 
+7. - 4102. Pixel intensity (0-255 grayscale) 
