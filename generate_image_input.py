@@ -1,30 +1,17 @@
 import os
 import csv
 import sys
-import random
 import numpy as np
 import dicom
-from skimage import transform, img_as_ubyte, feature, exposure, segmentation, color
-from skimage.future import graph
+from skimage import transform, img_as_ubyte, exposure
 from skimage.morphology import disk
 from skimage.filters import rank
 from skimage.filters.rank import enhance_contrast
 from skimage.restoration import denoise_tv_chambolle
 from joblib import Parallel, delayed
-import dill
-import pickle
-import boto
 from scipy import misc
 import math
 import json
-
-
-def is_number(s):
-    try:
-        float(s)
-        return True
-    except ValueError:
-        return False
 
 
 def mkdir(fname):
@@ -37,6 +24,13 @@ def mkdir(fname):
 def get_file_structure(root_path):
    """Return a JSON with user/slice/filepath hierarchy"""
 
+   def is_number(s):
+       try:
+           float(s)
+           return True
+       except ValueError:
+           return False
+
    output = []
 
    currentId = 0
@@ -45,14 +39,13 @@ def get_file_structure(root_path):
 
      if is_number(currentdir):     
        currentId = int(float(currentdir))
-       print("Walking user {0}".format(currentId))
+       print("Walking files for user {0}".format(currentId))
        userdict = {}
        userdict["UserId"] = str(currentId)
        userdict["Slices"] = []
        output.append(userdict)
 
      if ("sax" in currentdir):
-     #if ("sax" in currentdir and len(userdict["Slices"]) < 10):
        slicedict = {}
        slicedict["SliceId"] = currentdir.split("_")[1]
        slicedict["Files"] = sorted([x for x in files if ".dcm" in x], key = lambda f: int(float(f.split("-")[2].split(".")[0])))
@@ -63,48 +56,50 @@ def get_file_structure(root_path):
    for userdict in output:
      userdict["Slices"] = sorted(userdict["Slices"], key = lambda slice: int(float(slice["SliceId"])))    
 
-     #while (len(userdict["Slices"]) < 10):
-     #  userdict["Slices"].append(userdict["Slices"][-1])
-
-     #for slicedict in userdict["Slices"]:
-     #  while (len(slicedict["Files"]) < 30):
-     #      slicedict["Files"].append(slicedict["Files"][-1])
+   with open("{0}/file_structure.json".format(root_path),"w") as f:
+     json.dump(output, f, indent=2)
 
    return output  
 
 
-def process_sequences(userdict_array, preproc):
+def generate_csv(userdict_array):
 
-   image_info = Parallel()(delayed(get_user_data)(user_dict,preproc,idx) for idx, user_dict in enumerate(userdict_array))
+   image_info = Parallel()(delayed(generate_rows_for_user)(user_dict) for user_dict in userdict_array[:NUM_USERS])
 
    print("All finished, %d images in total" % len(image_info))
 
 
-def get_user_data(user_dict, preproc, idx):
-   print ("UserId: {0}".format(idx))
+def generate_rows_for_user(user_dict):
 
    userId = user_dict["UserId"]
 
-   user_output = []
+   print ("UserId: {0}".format(userId))
 
    for slice_dict in user_dict["Slices"]:
 
        sliceId = slice_dict["SliceId"]
 
        for file in slice_dict["Files"]:
-          dcm_path = "/data/data/{0}/{1}/study/sax_{2}/{3}".format(file_ind,userId,slice_dict["SliceId"],file)
+          dcm_path = "{0}/{1}/study/sax_{2}/{3}".format(folderpath, userId, slice_dict["SliceId"], file)
 
           timeId = file.split("-")[2].split(".")[0]
 
           dcm_img = dicom.read_file(dcm_path)
-          img = preproc(dcm_img)
 
+          img = preprocess(dcm_img)
+
+          # optionally save image
+          #save_img(img, dcm_path)
+
+          #unwrap the numpy array into a 1-d array
           img = img.reshape(img.size)
 
-          # 050Y = 50 years old. 048M = 48 months old
+          # DICOM file gives age as ###Letter, where Letter=Y, M, or W
+          # eg. 050Y = 50 years old. 048M = 48 months old
           age = int(dcm_img.PatientAge[:3])
           age_unit = dcm_img.PatientAge[-1]
           
+          # if M or W, convert to age to years
           if age_unit == "M":
             age = age/12
           elif age_unit == "W":
@@ -119,35 +114,25 @@ def get_user_data(user_dict, preproc, idx):
           row_data.append(dcm_img.PatientSex)
           row_data.append(int(math.floor(dcm_img.SliceLocation)))
           row_data.append(dcm_img.SliceThickness)
+          areamultiplier = float(dcm_img.PixelSpacing[0])*float(dcm_img.PixelSpacing[1])
+          row_data.append(np.round(areamultiplier,2))
 
           # actual image data as an unwrapped 64x64 array (0-255 grayscale)
           row_data.extend(img)
 
-          foutput.write(','.join(str(i) for i in row_data)+'\n')
+          # write out the labels
+          row_data.append(label_dict[userId][0])
+          row_data.append(label_dict[userId][1])
+
+          foutput.write(','.join(str(i) for i in row_data))
 
    return row_data
 
 
-def get_circle_params(slice_dict, userId):
-    key = str(userId) + "-" + str(slice_dict["SliceId"])
-    print (key)
-    if key in centers:
-       circle_params = centers[key]
-       print("found: {0}".format(circle_params[0]))
-    else:
-       circle_params = avg_params
-       print("not found: {0}".format(circle_params[0]))
-
-
-def get_img_from_dcm(dcm_img):
-  img = dcm_img.pixel_array.astype(float) / np.max(dcm_img.pixel_array)
-  return img
-
-
-def rotate90counter(img):
-  if img.shape[0] < img.shape[1]:
-       img = np.rot90(img)
-  return img
+def save_img(img, dcm_path):
+    jpg_path = dcm_path.rsplit(".", 1)[0] + ".64x64.jpg"     
+    misc.imsave(jpg_path, img)
+    print ("Saved {0}".format(jpg_path))
 
 
 def crop(img):
@@ -158,101 +143,75 @@ def crop(img):
    return crop_img
 
 
-def crop2(img, center_params):
-   radius_scaled = 1.5*center_params[2]
-   ylow = max(0, center_params[1]-radius_scaled)
-   yhigh = min(img.shape[0]-1, center_params[1]+radius_scaled)
-   xlow = max(0, center_params[0]-radius_scaled)
-   xhigh = min(img.shape[1]-1, center_params[0]+radius_scaled)
-   crop_img = img[ylow: yhigh , xlow : xhigh]
-   return crop_img
-
-
 def rescale(img, dcm_img):
-   xscale = 1/dcm_img.PixelSpacing[0]   
-   yscale = 1/dcm_img.PixelSpacing[1]   
+   xscale = dcm_img.PixelSpacing[0]   
+   yscale = dcm_img.PixelSpacing[1]   
 
    rescaled_img = transform.rescale(img, (xscale, yscale) )
    return rescaled_img
 
 
-def resize(img, size):
-   resized_img = transform.resize(img, (size, size))
-   return resized_img
+def preprocess(dcm_img):
+   '''Take the DICOM file and convert it to a numpy array'''
 
+   # generate a numpy array with range 0-1 pixel intensities
+   img = dcm_img.pixel_array.astype(float) / np.max(dcm_img.pixel_array)
 
-def convertdtype(img):
-  return img_as_ubyte(img)
+   # some images have height < width. 
+   #in this case, rotate counter-clockwise so all images have same orientation
+   if img.shape[0] < img.shape[1]:
+     img = np.rot90(img)
 
-
-def cannyedge(img, s):
-  return feature.canny(img, sigma=s)
-
-
-def preprocess_func(dcm_img):
-
-   img = get_img_from_dcm(dcm_img)
-
+   # crop a square image from the center
    img = crop(img)
 
+   # scale the image by the pixel spacing given in the DICOM file
    img = rescale(img, dcm_img)
-   img = resize(img, 64)
 
-   img = denoise_tv_chambolle(img, weight=0.05, multichannel=False)
+   # resize the image based on given number of pixels
+   img = transform.resize(img, (NUM_PIXELS, NUM_PIXELS))
+
+   # optionally denoise the image
+   #img = denoise_tv_chambolle(img, weight=0.05, multichannel=False)
+
+   # enhance the contrast of the image to make regions more distinct
    selem = disk(30)
    img = rank.equalize(img, selem=selem)
-   img = exposure.rescale_intensity(convertdtype(img))
-
-   img = rotate90counter(img)
+   img = img_as_ubyte(img) # converts 0-1 range to 0-255 range
+   img = exposure.rescale_intensity(img)
 
    return img
 
 
-def get_inputs():
-    mode_param = sys.argv[1]
-
-    if (mode_param != 'train' and mode_param != 'validate'):
-      print("Invalid mode")
-      exit()
- 
-    train = mode_param == 'train'
-
-    if (train):
-      file_ind = 'train'
-    else:
-      file_ind = 'validate'
-
-    return file_ind
-
-
-def get_centers(file):
-    centers = {}
-    x = []
-    y = []
-    r = []
-    with open(file) as f:
-      for line in f:
-        items = line.split(",")
-        key = items[0] + "-" + items[1].strip()
-        val = (int(float(items[2])), int(float(items[3])), int(float(items[4])))
-        x.append(int(float(items[2])))
-        y.append(int(float(items[3])))
-        r.append(int(float(items[4])))
-        centers[key] = val
-
-    avg_params = (int(np.array(x).mean()), int(np.array(y).mean()), int(np.array(r).mean()))
-
-    return centers, avg_params
-
+def get_labels(file):
+    label_dict = {}
+    with open(file,"r") as f:
+        next(f)
+        for line in f: 
+            tokens = line.split(",")
+            userid = tokens[0]
+            systole = tokens[1]
+            diastole = tokens[2]
+            label_dict[userid] = (systole, diastole)
+    return label_dict
+            
 
 if __name__ == "__main__":
 
-    random.seed(10)
+    label_dict = get_labels("/data/data/train.csv")
 
-    file_ind = get_inputs()
+    folderpath = "/data/data/train"
 
-    file_structure = get_file_structure("/data/data/{0}".format(file_ind))
+    NUM_USERS = 50
+    NUM_PIXELS = 64
 
-    with open("/data/staging/test.csv","w") as foutput:
-      process_sequences(file_structure, preprocess_func)
+    # e.g. look for the train folder at /data/data/train
+    # file_structure is a JSON-like object with user/slice/path_to_DICOM_file hierarchy
+    file_structure = get_file_structure(folderpath)
+
+    # write out the csv to foutpath
+    foutpath = "{0}/train_input.csv".format(folderpath)
+    with open(foutpath,"w") as foutput:
+      # crawl through the file_structure and process the DICOM files
+      generate_csv(file_structure)
 
