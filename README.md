@@ -28,8 +28,9 @@ Columns in file train_input_meta_only.csv
 * 4. Gender
 * 5. Slice location
 * 6. Slice thickness
-* 7. Systole volume (label)
-* 8. Diastole volume (label)
+* 7. Area Multiplier (= mm^2/pixel^2)
+* 8. Systole volume (label)
+* 9. Diastole volume (label)
 
 Columns in file centers_area.csv
 
