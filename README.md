@@ -43,7 +43,8 @@ Columns in file centers_area.csv
 * 6. Radius of circular region of interest surrounding left ventricle (in pixels)
 
 Columns in file meta-and-areas-df.csv
-This file contains all the computed areas for all slices and users at a particular time (0010)
+This file contains all the computed areas for all slices and users at a particular time (0010).
+If the user does not have a corresponding slice, we just pick the closest existing slice so all users have the "same" set of features.
 * 0. User Id. Corresponds to folder name (1-500 for train) (501-700 for validation)
 * 1. Age
 * 2. Gender
