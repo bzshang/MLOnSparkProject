@@ -42,3 +42,24 @@ Columns in file centers_area.csv
 * 5. X coordinate of left ventricle center (in pixels)
 * 6. Radius of circular region of interest surrounding left ventricle (in pixels)
 
+Columns in file meta-and-areas-df.csv
+* 0. User Id. Corresponds to folder name (1-500 for train) (501-700 for validation)
+* 1. Age
+* 2. Gender
+* 3. Area of slice 0
+* 4. Area of slice 1
+* 5. Area of slice 2
+* 6. Area of slice 3
+* 7. Area of slice 4
+* 8. Area of slice 5
+* 9. Area of slice 6
+* 10. Area of slice 7
+* 11. Area of slice 8
+* 12. Area of slice 9
+* 13. Area of slice 10
+* 14. Area of slice 11
+* 15. Area of slice 12
+* 16. Area of slice 13
+* 17. Area of slice 14
+* 18. Systole volume (label)
+* 19. Diastole volume (label)
