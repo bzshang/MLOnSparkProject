@@ -67,3 +67,30 @@ If the user does not have a corresponding slice, we just pick the closest existi
 * 17. Area of slice 14
 * 18. Systole volume (label)
 * 19. Diastole volume (label)
+
+Columns in file meta-and-areas2-df.csv
+
+This file contains all the computed areas for all slices and users at a particular time (0010).
+If the user does not have a corresponding slice, we just pick the closest existing slice so all users have the "same" set of features.
+
+* 0. User Id. Corresponds to folder name (1-500 for train) (501-700 for validation)
+* 1. Time Id (ranges from 1-30)
+* 2. Age
+* 3. Gender
+* 4. Area of slice 0
+* 5. Area of slice 1
+* 6. Area of slice 2
+* 7. Area of slice 3
+* 8. Area of slice 4
+* 9. Area of slice 5
+* 10. Area of slice 6
+* 11. Area of slice 7
+* 12. Area of slice 8
+* 13. Area of slice 9
+* 14. Area of slice 10
+* 15. Area of slice 11
+* 16. Area of slice 12
+* 17. Area of slice 13
+* 18. Area of slice 14
+* 19. Systole volume (label)
+* 20. Diastole volume (label)
