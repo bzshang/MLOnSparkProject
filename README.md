@@ -70,7 +70,7 @@ If the user does not have a corresponding slice, we just pick the closest existi
 
 Columns in file meta-and-areas2-df.csv
 
-This file contains all the computed areas for all slices and users at a particular time (0010).
+This file contains all the computed areas for all slices and times for all users.
 If the user does not have a corresponding slice, we just pick the closest existing slice so all users have the "same" set of features.
 
 * 0. User Id. Corresponds to folder name (1-500 for train) (501-700 for validation)
